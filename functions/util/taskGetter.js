@@ -1,11 +1,13 @@
 const { db, admin } = require("./admin");
 
-module.exports = (taskRefId, taskStatus) => {
+exports.getTask = async (taskRefId, taskStatus) => {
+    console.log("i have been called to fetch task with id: "+taskRefId+" and status: "+taskStatus)
     let dataGets = []
-    db.doc(`/tasks/${taskRefId}`).get()
+    let task = {}
+    return db.doc(`/tasks/${taskRefId}`).get()
     .then(taskData=>{
         if(taskData.data().status == taskStatus){
-            let task = {}
+            console.log("found task: "+taskRefId)
             task = taskData.data()
         dataGets.push(new Promise((resolve,reject)=>{
             db.collection("tasks")
@@ -14,9 +16,11 @@ module.exports = (taskRefId, taskStatus) => {
             .get()
             .then(PICList=>{
                 task.PIC = []
+                if(PICList.size > 0){
                 PICList.forEach(PICData=>{
                     task.PIC.push(PICData.data())
                 })
+                }
                 return true
             })
             .then(()=>{
@@ -33,9 +37,11 @@ module.exports = (taskRefId, taskStatus) => {
                 .get()
                 .then(supervisorList=>{
                     task.supervisors = []
-                    supervisorList.forEach(supervisorData=>{
-                        task.supervisors.push(supervisorData.data())
-                    })
+                    if(supervisorList.size > 0){
+                        supervisorList.forEach(supervisorData=>{
+                            task.supervisors.push(supervisorData.data())
+                        })
+                    }
                     return true
                 })
                 .then(()=>{
@@ -52,9 +58,11 @@ module.exports = (taskRefId, taskStatus) => {
                 .get()
                 .then(commentList=>{
                     task.comments = []
-                    commentList.forEach(commentData=>{
-                        task.comments.push(commentData.data())
-                    })
+                    if(commentList.size > 0){
+                        commentList.forEach(commentData=>{
+                            task.comments.push(commentData.data())
+                        })
+                    }
                     return true
                 })
                 .then(()=>{
@@ -71,9 +79,11 @@ module.exports = (taskRefId, taskStatus) => {
                 .get()
                 .then(filesList=>{
                     task.files = []
-                    filesList.forEach(filesData=>{
-                        task.files.push(filesData.data())
-                    })
+                    if(filesList.size > 0){
+                        filesList.forEach(filesData=>{
+                            task.files.push(filesData.data())
+                        })
+                    }
                     return true
                 })
                 .then(()=>{
@@ -90,12 +100,26 @@ module.exports = (taskRefId, taskStatus) => {
                 .get()
                 .then(taskResponsesList=>{
                     task.taskResponses = []
+                    let resarray = []
+                    let tempRes = []
+                    let i = 0
                     if(taskResponsesList.size > 0){
-                        taskResponsesList.forEach(taskResponsesData=>{
-                            task.taskResponses.push(getTaskResponse(taskResponsesData,taskRefId))
+                        console.log("This task have "+taskResponsesList.size+" responses")
+                        taskResponsesList.forEach(async taskResponsesData=>{
+                            resarray.push(new Promise(async (resolve,reject) =>{
+                                await getTaskResponse(taskResponsesData,taskRefId)
+                                .then((feed)=>{
+                                    tempRes[i] = feed
+                                    task.taskResponses.push(tempRes[i])
+                                    resolve(tempRes[i])
+                                })
+                            }))
+                            i = i + 1;
                         })
                     }
-                    return true
+                    Promise.all(resarray).then(()=>{
+                        return true
+                    })
                 })
                 .then(()=>{
                     return resolve(true)
@@ -106,16 +130,19 @@ module.exports = (taskRefId, taskStatus) => {
         }))
         Promise.all(dataGets)
         .then(()=>{
-            return task;
+            console.log("function found the task as below:"+ taskRefId)
+            console.log(task)
+            return true
         })
-        } else return null;
+        }
+        return task;
     })
     .catch(err =>{
         console.error(err)
     })
 }
 
-const getTaskResponse = (data,taskId) => {
+exports.getTaskResponse = async (data,taskId) => {
     let taskResponse = {}
     let responseGets = []
     taskResponse.id = data.id
@@ -128,10 +155,12 @@ const getTaskResponse = (data,taskId) => {
             .collection("files")
             .get()
             .then(filesList=>{
+                if(filesList.size > 0){
                 taskResponse.files = []
                 filesList.forEach(filesData=>{
                     taskResponse.files.push(filesData.data())
                 })
+                }
                 return true
             })
             .then(()=>{
@@ -149,10 +178,12 @@ const getTaskResponse = (data,taskId) => {
             .collection("comments")
             .get()
             .then(commentsList=>{
+                if(commentsList.size > 0){
                 taskResponse.comments = []
                 commentsList.forEach(commentsData=>{
                     taskResponse.comments.push(commentsData.data())
                 })
+                }
                 return true
             })
             .then(()=>{
@@ -171,12 +202,26 @@ const getTaskResponse = (data,taskId) => {
             .get()
             .then(responseList=>{
                 taskResponse.responses = []
+                let responsesarray = []
+                let resz = []
+                let j = 0
                 if(responseList.size > 0){
-                    responseList.forEach(responseData=>{
-                        taskResponse.responses.push(getResponseResponse(responseData,taskResponse.id,taskId))
+                    console.log("This task response have "+responseList.size+" responses")
+                    responseList.forEach(async responseData=>{
+                        responsesarray.push(new Promise(async (resolve, reject)=>{
+                            await getResponseResponse(responseData,taskResponse.id,taskId)
+                            .then((feed)=>{
+                                resz[j] = feed
+                                taskResponse.responses.push(resz[j])
+                                resolve(resz[j])
+                            })
+                        }))
+                        j++;
                     })
                 }
-                return true
+                Promise.all(responsesarray).then(()=>{
+                    return true
+                })
             })
             .then(()=>{
                 return resolve(true)
@@ -185,7 +230,7 @@ const getTaskResponse = (data,taskId) => {
                 console.error(err)
             })
     }))
-    Promise.all(responseGets)
+    return Promise.all(responseGets)
     .then(()=>{
         return taskResponse;
     })
@@ -194,7 +239,7 @@ const getTaskResponse = (data,taskId) => {
     })
 }
 
-const getResponseResponse = (data,taskResponseId,taskId) => {
+exports.getResponseResponse = async (data,taskResponseId,taskId) => {
     let response = {}
     let reresponseGets = []
     response.id = data.id
@@ -249,7 +294,7 @@ const getResponseResponse = (data,taskResponseId,taskId) => {
                 console.error(err)
             })
     }))
-    Promise.all(reresponseGets)
+    return Promise.all(reresponseGets)
     .then(()=>{
         return response;
     })

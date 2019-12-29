@@ -1,37 +1,35 @@
 const { db, admin } = require("../util/admin");
-const getTask = require("../util/taskGetter");
+const { getTask }  = require("../util/taskGetter");
 
 exports.getTeamMember = (req, res) => {
     let resData = {};
+    resData.sharedTasks = []
+    resData.messages = [];
     db.doc(`/users/${req.params.userHandle}`)
       .get()
       .then(doc => {
         if (doc.exists) {
           resData.credentials = doc.data();
           return db
-            .collection(`users`)
-            .doc(doc.id)
-            .collection(messages)
+            .collectionGroup("messages")
             .where("userHandle","==",req.user.handle)
             .get();
         }
       })
       .then((msgs)=>{
-        resData.messages = [];
+        console.log(`${req.user.handle}`)
         msgs.forEach(msg => {
-          resData.messages.push(msg.data());
+            if(msg.ref.parent.parent.id == req.params.userHandle) resData.messages.push(msg.data());
         })
         return  db
-        .collection(`users`)
-        .doc(req.user.handle)
-        .collection(messages)
+        .collectionGroup("messages")
         .where("userHandle","==",req.params.userHandle)
         .get();
       })
       .then((txts)=>{
-        resData.messages = [];
+          console.log(`${req.params.userHandle}`)
         txts.forEach(txt => {
-          resData.messages.push(txt.data());
+           if(txt.ref.parent.parent.id == req.user.handle) resData.messages.push(txt.data());
         })
         return true;
       })
@@ -54,107 +52,122 @@ exports.getTeamMember = (req, res) => {
                     .get()
       })
       .then((picsRef)=>{
-          resData.sharedTasks = []
+          let picsrefarray = []
+          let picsarray = []
           picsRef.forEach(picref => {
+            picsarray.push( new Promise((resolve, reject) => {
+                resolve(
               picref.ref.parent.get().then(pics => {
-                  pics.forEach(pic=>{
+                  pics.forEach(async pic=>{
                       if(pic.data().handle == req.user.handle){
-                        new Promise((resolve, reject) => {
-                            resolve(getTask(picref.ref.parent.parent.id, req.params.taskStatus))
-                          })
-                          .then((value) => {
-                            if(value){
-                                resData.sharedTasks.push(value)
-                            }
-                          })
-                          .catch(error =>{
-                              console.error(error)
-                              return res.status(500).json({ error: "Something went wrong" })
-                          })
+                        console.log("got one")
+                        picsrefarray.push( new Promise(async (resolve, reject) => {
+                              await getTask(pic.ref.parent.parent.id, req.params.taskStatus)
+                              .then((theTask)=>{
+                                console.log("The task found is this"+pic.ref.parent.parent.id)
+                                resData.sharedTasks.push(theTask)
+                                console.log(theTask)
+                              resolve(theTask)
+                              })
+                          }))
                       }
                   })
-                  return picref.ref.parent.parent.collection("supervisors").get()
+                  return Promise.all(picsrefarray).then(()=>{
+                    return picref.ref.parent.parent.collection("supervisors").get()
+                  })
               })
               .then(sups=>{
-                sups.forEach(sup=>{
+                let supsrefarray = []
+                sups.forEach(async sup=>{
                     if(sup.data().handle == req.user.handle){
-                      new Promise((resolve, reject) => {
-                          resolve(getTask(sup.ref.parent.parent.id, req.params.taskStatus))
-                        })
-                        .then((value) => {
-                          if(value){
-                              resData.sharedTasks.push(value)
-                          }
-                        })
-                        .catch(error =>{
-                            console.error(error)
-                            return res.status(500).json({ error: "Something went wrong" })
-                        })
+                     supsrefarray.push( new Promise(async (resolve, reject) => {
+                            console.log("The task found is this"+sup.ref.parent.parent.id)
+                            await getTask(sup.ref.parent.parent.id, req.params.taskStatus)
+                            .then((theTask)=>{
+                                resData.sharedTasks.push(theTask)
+                                console.log(theTask)
+                              resolve(theTask)
+                            })
+                        }))
                     }
+                }) 
+               return Promise.all(supsrefarray).then(()=>{
+                  return true
                 })
               })
               .catch(error =>{
                   console.error(error)
                   return res.status(500).json({ error: "Something went wrong" })
               })
+            )}))
           })
-          return  db
-          .collectionGroup("supervisors")
-          .where("handle","==",req.params.userHandle)
-          .get()
+          return Promise.all(picsarray).then(()=>{
+            console.log(resData.sharedTasks)
+            return  db
+            .collectionGroup("supervisors")
+            .where("handle","==",req.params.userHandle)
+            .get()
+           })
       })
       .then((supsRef)=>{
-          resData.sharedTasks = []
+          let suprefarray = []
+          let supsarray = []
           supsRef.forEach(supref => {
+            supsarray.push( new Promise((resolve, reject) => {
+                resolve(
               supref.ref.parent.get().then(supers => {
-                  supers.forEach(superData=>{
+                  supers.forEach(async superData=>{
                       if(superData.data().handle == req.user.handle){
-                        new Promise((resolve, reject) => {
-                            resolve(getTask(supref.ref.parent.parent.id, req.params.taskStatus))
-                          })
-                          .then((val) => {
-                            if(val){
-                                resData.sharedTasks.push(val)
-                            }
-                          })
-                          .catch(error =>{
-                              console.error(error)
-                              return res.status(500).json({ error: "Something went wrong" })
-                          })
+                        suprefarray.push(new Promise(async (resolve, reject) => {
+                                console.log("The task found is this"+supref.ref.parent.parent.id)
+                              await getTask(supref.ref.parent.parent.id, req.params.taskStatus)
+                              .then((theTask)=>{
+                                resData.sharedTasks.push(theTask)
+                                console.log(theTask)
+                              resolve(theTask)
+                              })
+                          }))
                       }
                   })
-                  return supref.ref.parent.parent.collection("PIC").get()
+                  return Promise.all(suprefarray).then(()=>{
+                    return supref.ref.parent.parent.collection("PIC").get()
+                  })
               })
               .then(picMembers=>{
-                picMembers.forEach(pc=>{
+                let picrefarray = []
+                picMembers.forEach(async pc=>{
                     if(pc.data().handle == req.user.handle){
-                      new Promise((resolve, reject) => {
-                          resolve(getTask(pc.ref.parent.parent.id, req.params.taskStatus))
-                        })
-                        .then((vl) => {
-                          if(vl){
-                              resData.sharedTasks.push(vl)
-                          }
-                        })
-                        .catch(error =>{
-                            console.error(error)
-                            return res.status(500).json({ error: "Something went wrong" })
-                        })
+                     picrefarray.push( new Promise(async (resolve, reject) => {
+                            console.log("The task found is this"+pc.ref.parent.parent.id)
+                          await getTask(pc.ref.parent.parent.id, req.params.taskStatus)
+                          .then((theTask)=>{
+                            console.log(theTask)
+                            resData.sharedTasks.push(theTask)
+                          resolve(theTask)
+                          })
+                        }))
                     }
+                })
+                return Promise.all(picrefarray).then(()=>{
+                  return true
                 })
               })
               .catch(error =>{
                   console.error(error)
                   return res.status(500).json({ error: "Something went wrong" })
               })
+            )}))
           })
-          return true
+          return Promise.all(supsarray).then(()=>{
+            console.log(resData.sharedTasks)
+            return true
+          })
       })
       .then(()=>{
+          console.log(resData)
           return res.status(200).json({ resData })
       })
       .catch(err => {
-        res.status(200).json(resData);
         console.error(err);
         return res.status(400).json({ error: err.code });
       });
@@ -167,7 +180,7 @@ exports.getTeamMember = (req, res) => {
       .then(docs => {
         if (docs.size != 0) {
           docs.forEach(doc=>{
-              if(doc.id != system) team.push(doc.data())
+              if(doc.id != "system") team.push(doc.data())
           })
         }
       })

@@ -1,6 +1,6 @@
 const { db, admin } = require("../util/admin");
 const firebase_tools = require("firebase-tools");
-const getTask  = require("../util/taskGetter");
+const { getTask }  = require("../util/taskGetter");
 
 exports.postTask = (req, res) => {
   if (req.user.onDuty == false) {
@@ -269,13 +269,13 @@ exports.getTask = (req, res) => {
     if(authorized == false) return res.status(403).json({ error: "Unauthorized!" })
     return db.collection("tasks").doc(req.params.taskId).get()
   })
-  .then(taskRefData=>{
-    taskfeed = getTask(taskRefData.id,taskRefData.data().status)
+  .then(async taskRefData=>{
+    let taskfeed = await getTask(taskRefData.id,taskRefData.data().status)
     return taskfeed
   })
   .then((task)=>{
     console.log(task)
-    return res.status(200).json(taskfeed)
+    return res.status(200).json(task)
   })
   .catch(err => {
     console.error(err)
@@ -287,42 +287,43 @@ exports.getTasks = (req, res) => {
   let myTasks = []
   db
     .collectionGroup("PIC")
-    .where("handle","==",req.user.userHandle)
+    .where("handle","==",req.user.handle)
     .get()
     .then((picsRef)=>{
       picsRef.forEach(picref => {
-        new Promise((resolve, reject) => {
-            resolve(getTask(picref.ref.parent.parent.id, req.params.taskStatus))
+        new Promise(async (resolve, reject) => {
+            await getTask(picref.ref.parent.parent.id, req.params.taskStatus)
+            .then((value) => {
+              if(value){
+                  myTasks.push(value)
+              }
+              resolve (value)
+            })
+            .catch(error =>{
+                console.error(error)
+                return res.status(500).json({ error: "Something went wrong" })
+            })
           })
+      })
+      return  db
+      .collectionGroup("supervisors")
+      .where("handle","==",req.user.handle)
+      .get()
+  })
+  .then((supsRef)=>{
+    supsRef.forEach(supref => {
+      new Promise(async (resolve, reject) => {
+          await getTask(supref.ref.parent.parent.id, req.params.taskStatus)
           .then((value) => {
             if(value){
                 myTasks.push(value)
             }
+            resolve (value)
           })
           .catch(error =>{
               console.error(error)
               return res.status(500).json({ error: "Something went wrong" })
           })
-      })
-      return  db
-      .collectionGroup("supervisors")
-      .where("handle","==",req.params.userHandle)
-      .get()
-  })
-  .then((supsRef)=>{
-    supsRef.forEach(supref => {
-      new Promise((resolve, reject) => {
-          resolve(getTask(supref.ref.parent.parent.id, req.params.taskStatus))
-        })
-        .then((value) => {
-          if(value){
-              myTasks.push(value)
-          }
-          return true
-        })
-        .catch(error =>{
-            console.error(error)
-            return res.status(500).json({ error: "Something went wrong" })
         })
     })
     return true

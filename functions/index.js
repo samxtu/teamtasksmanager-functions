@@ -73,7 +73,7 @@ app.post("/teamtask", FBAuth, taskFiles, postTask);
 
 app.get("/task/:taskId", FBAuth, getTask);
 
-app.post("/tasks/:taskStatus", FBAuth, getTasks);
+app.get("/tasks/:taskStatus", FBAuth, getTasks);
 
 app.post("/taskfiles/:taskId", FBAuth, taskFiles, addFilesToTask);
 
