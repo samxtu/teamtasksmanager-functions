@@ -1,2 +1,2 @@
 # teamtasksmanager-functions
-API for tem tasks manager app (DEV)
+API for team tasks manager app (DEV)
