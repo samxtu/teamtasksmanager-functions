@@ -238,7 +238,7 @@ exports.getAuthenticatedUser = (req, res) => {
         return db
           .collection(`users`)
           .doc(doc.id)
-          .collection(notifications)
+          .collection('notifications')
           .get();
       }
     })

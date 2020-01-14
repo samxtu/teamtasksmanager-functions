@@ -338,20 +338,26 @@ exports.addPICS = (req, res) => {
     return res.status(401).json({ Error: "Unauthorized!" });
   if (req.body.PICS.length < 1)
     return response.status(400).json({ error: "No user was selected! " });
+  let reqArray = [];
   req.body.PICS.forEach(picdata => {
+    reqArray.push(new Promise((resolve, reject) => {
     db.collection("tasks")
       .doc(req.params.taskId)
       .collection("PIC")
       .doc()
       .set(picdata)
       .then(() => {
-        return res.status(200).json(picdata);
+        return resolve(true)
       })
       .catch(err => {
         console.error(err);
         return res.status(500).json({ error: err.code });
       });
+    }))
   });
+  Promise.all(reqArray).then(()=>{
+    return res.status(200).json({ message: 'PICS added successfully!'});
+  })
 };
 
 exports.addSupervisors = (req, res) => {
@@ -359,7 +365,9 @@ exports.addSupervisors = (req, res) => {
     return res.status(401).json({ Error: "Unauthorized!" });
   if (req.body.supervisors.length < 1)
     return response.status(400).json({ error: "No user was selected! " });
+  let reqArray = [];
   req.body.supervisors.forEach(supdata => {
+    reqArray.push(new Promise((resolve, reject) => {
     db.collection("tasks")
       .doc(req.params.taskId)
       .collection("supervisors")
@@ -372,7 +380,11 @@ exports.addSupervisors = (req, res) => {
         console.error(err);
         return res.status(500).json({ error: err.code });
       });
+    }))
   });
+  Promise.all(reqArray).then(()=>{
+    return res.status(200).json({ message: 'Supervisors added successfully!'});
+  })
 };
 
 exports.removeSupervisors = (req, res) => {
@@ -380,11 +392,13 @@ exports.removeSupervisors = (req, res) => {
     return res.status(401).json({ Error: "Unauthorized!" });
   if (req.body.supervisors.length < 1)
     return response.status(400).json({ error: "No user was selected! " });
+    let reqArray = [];
   req.body.supervisors.forEach(supdata => {
+    reqArray.push(new Promise((resolve, reject) => {
     if (req.user.handle == supdata.handle)
       return response
         .status(400)
-        .json({ error: "This user is a mandatory supervisor in this task! " });
+        .json({ error: "User is a mandatory supervisor in this task! :"+supdata.handle });
     db.collection("tasks")
       .doc(req.params.taskId)
       .collection("supervisors")
@@ -397,7 +411,11 @@ exports.removeSupervisors = (req, res) => {
         console.error(err);
         return res.status(500).json({ error: err.code });
       });
+    }))
   });
+  Promise.all(reqArray).then(()=>{
+    return res.status(200).json({ message: 'Supervisors removed successfully!'});
+  })
 };
 
 exports.removePICS = (req, res) => {
@@ -405,7 +423,9 @@ exports.removePICS = (req, res) => {
     return res.status(401).json({ Error: "Unauthorized!" });
   if (req.body.PICS.length < 1)
     return res.status(400).json({ error: "No user was selected! " });
+    let reqArray = [];
   req.body.PICS.forEach(picdata => {
+    reqArray.push(new Promise((resolve, reject) => {
     if (req.user.handle == picdata.handle)
       return res
         .status(400)
@@ -422,7 +442,11 @@ exports.removePICS = (req, res) => {
         console.error(err);
         return res.status(500).json({ error: err.code });
       });
+    }))
   });
+  Promise.all(reqArray).then(()=>{
+    return res.status(200).json({ message: 'PICS removed successfully!'});
+  })
 };
 
 exports.postTaskResponse = (req, res) => {
@@ -2181,32 +2205,3 @@ exports.deleteResponseResponseComment = (req, res) => {
       return res.status(500).json({ error: err.code });
     });
 };
-
-// exports.getScream = (request,response) =>{
-//     let screamData = {};
-//     db.doc(`/screams/${request.params.screamId}`).get()
-//     .then((data) =>{
-//         if(!data.exists){
-//             return response.status(404).json({ error: "Scream not found!" })
-//         }
-//         screamData = data.data();
-//         screamData.screamId = data.id;
-//         return db.collection('comments').orderBy('createdAt','desc').where('screamId', '==', request.params.screamId).get();
-//     })
-//     .then((comments)=>{
-//         screamData.comments = [];
-//         if(comments){
-//             comments.forEach(doc=>{
-//                 screamData.comments.push({
-//                     commentId: doc.id,
-//                     ...doc.data()
-//                 });
-//             })
-//         }
-//         return response.json(screamData);
-//     })
-//     .catch(error =>{
-//         console.error(error);
-//         return response.status(500).json({ error: error.code })
-//     })
-// }
