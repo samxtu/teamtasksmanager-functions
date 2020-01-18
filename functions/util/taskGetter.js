@@ -8,6 +8,7 @@ exports.getTask = async (taskRefId, taskStatus) => {
     .then(taskData=>{
         if(taskData.data().status == taskStatus){
             console.log("found task: "+taskRefId)
+            task.taskId = taskData.id
             task = taskData.data()
         dataGets.push(new Promise((resolve,reject)=>{
             db.collection("tasks")
@@ -60,7 +61,7 @@ exports.getTask = async (taskRefId, taskStatus) => {
                     task.comments = []
                     if(commentList.size > 0){
                         commentList.forEach(commentData=>{
-                            task.comments.push(commentData.data())
+                            task.comments.push({commentId: commentData.id,...commentData.data()})
                         })
                     }
                     return true
@@ -145,7 +146,7 @@ exports.getTask = async (taskRefId, taskStatus) => {
 exports.getTaskResponse = async (data,taskId) => {
     let taskResponse = {}
     let responseGets = []
-    taskResponse.id = data.id
+    taskResponse.taskResponseId = data.id
     taskResponse = data.data()
     responseGets.push(new Promise((resolve,reject)=>{
         db.collection("tasks")
@@ -181,7 +182,7 @@ exports.getTaskResponse = async (data,taskId) => {
                 if(commentsList.size > 0){
                 taskResponse.comments = []
                 commentsList.forEach(commentsData=>{
-                    taskResponse.comments.push(commentsData.data())
+                    taskResponse.comments.push({commentId:commentsData.id,...commentsData.data()})
                 })
                 }
                 return true
@@ -242,7 +243,7 @@ exports.getTaskResponse = async (data,taskId) => {
 exports.getResponseResponse = async (data,taskResponseId,taskId) => {
     let response = {}
     let reresponseGets = []
-    response.id = data.id
+    response.responseResponseid = data.id
     response = data.data()
     reresponseGets.push(new Promise((resolve,reject)=>{
         db.collection("tasks")
@@ -282,7 +283,7 @@ exports.getResponseResponse = async (data,taskResponseId,taskId) => {
                 response.comments = []
                 if(commentsList.exists){
                     commentsList.forEach(commentData=>{
-                        response.comments.push(commentData.data())
+                        response.comments.push({commentId:commentData.id,...commentData.data()})
                     })
                 }
                 return true

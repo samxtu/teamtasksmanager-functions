@@ -250,7 +250,6 @@ exports.postTask = (req, res) => {
 
 exports.getTask = (req, res) => {
   let authorized = false;
-  let taskfeed = {}
   db.collection("tasks").doc(req.params.taskId).collection("PIC").get()
   .then(PICS =>{
     PICS.forEach(pic=>{
@@ -447,6 +446,10 @@ exports.removePICS = (req, res) => {
   Promise.all(reqArray).then(()=>{
     return res.status(200).json({ message: 'PICS removed successfully!'});
   })
+  .catch(err => {
+    console.error(err);
+    return res.status(500).json({ error: err.code });
+  });
 };
 
 exports.postTaskResponse = (req, res) => {
@@ -529,7 +532,7 @@ exports.postTaskResponse = (req, res) => {
         return batch.commit();
       })
       .then(() => {
-        return res.json({
+        return res.status(200).json({
           taskId: req.body.taskId,
           taskResponseId: feed.id,
           files: files,
@@ -546,7 +549,7 @@ exports.postTaskResponse = (req, res) => {
       .collection("taskResponses")
       .add(newResponse)
       .then(feedback => {
-        return res.json({
+        return res.status(200).json({
           taskId: req.body.taskId,
           taskResponseId: feedback.id,
           files: [],
@@ -728,7 +731,7 @@ exports.postCommentToTask = (req, res) => {
         .add(newComment);
     })
     .then(addedComment => {
-      return res.json({
+      return res.status(200).json({
         commentId: addedComment.id,
         taskId: req.body.taskId,
         ...newComment

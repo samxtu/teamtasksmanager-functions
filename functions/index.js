@@ -50,6 +50,12 @@ app.get("/team", FBAuth, getTeamMembers);
 
 app.get("/team/:userHandle/:taskStatus", FBAuth, getTeamMember);
 
+app.post("/changeonduty/:userHandle", FBAuth, changeOndutyStatus);
+
+app.get("/allowadduser/:userHandle", FBAuth, allowAddingUsers);
+
+app.get("/denyadduser/:userHandle", FBAuth, denyAddingUsers);
+
 //user routes
 app.post("/signup", FBAuth, signup);
 
@@ -57,15 +63,9 @@ app.post("/login", login);
 
 app.post("/user/image", FBAuth, uploadProfileImage);
 
-app.post("/changeonduty/:userHandle", FBAuth, changeOndutyStatus);
-
 app.post("/sendmessage/:userHandle", FBAuth, sendMessage);
 
 app.get("/user", FBAuth, getAuthenticatedUser);
-
-app.get("/allowadduser/:userHandle", FBAuth, allowAddingUsers);
-
-app.get("/denyadduser/:userHandle", FBAuth, denyAddingUsers);
 
 // task routes
 
