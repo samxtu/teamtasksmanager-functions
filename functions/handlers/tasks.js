@@ -328,7 +328,7 @@ exports.getTasks = (req, res) => {
     return true
   })
   .then(()=>{
-    return res.status(200).json({ [req.params.taskStatus+' tasks']: myTasks })
+    return res.status(200).json(myTasks)
   })
 } 
 

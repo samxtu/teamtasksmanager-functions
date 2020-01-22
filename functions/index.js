@@ -18,6 +18,11 @@ const {
   getTeamMembers
 } = require("./handlers/team");
 const {
+  addTodo,
+  editTodo,
+  changeTodoStatus
+} = require("./handlers/todo");
+const {
   postTask,
   getTask,
   getTasks,
@@ -44,6 +49,13 @@ const {
   removePICS,
   removeSupervisors
 } = require("./handlers/tasks");
+
+//todo routes
+app.post("/todo", FBAuth, addTodo);
+
+app.get("/todo/:todoid/:status", FBAuth, editTodo);
+
+app.post("/todo/:todoid", FBAuth, editTodo);
 
 //team routes
 app.get("/team", FBAuth, getTeamMembers);
