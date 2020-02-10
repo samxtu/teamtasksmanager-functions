@@ -78,6 +78,7 @@ exports.postTask = (req, res) => {
     title: req.body.title,
     details: req.body.details,
     status: req.body.status,
+    repeat: req.body.repeat,
     commentCount: 0,
     childrenCount: 0,
     PICCount: req.body.PIC.length,
@@ -101,6 +102,14 @@ exports.postTask = (req, res) => {
       ...supervisor
     });
   });
+  
+  let newShedule = {
+    body: req.body.title,
+    createdAt: new Date().toISOString(),
+    deadline: req.body.deadline,
+    repeat: req.body.repeat,
+    type: 'task'
+  }
 
   const files = req.files;
   let batches = [];
@@ -127,6 +136,16 @@ exports.postTask = (req, res) => {
             sup
           );
           batchCounter = batchCounter + 1;
+          batches[batchCounter] = db.batch();
+          batches[batchCounter].set(
+            db
+              .collection("users")
+              .doc(sup.handle)
+              .collection("schedule")
+              .doc(feedback.id),
+            {...newShedule,typeId:feedback.id}
+          );
+          batchCounter = batchCounter + 1;
         });
         PICS.forEach((pc, j) => {
           batches[batchCounter] = db.batch();
@@ -142,6 +161,16 @@ exports.postTask = (req, res) => {
               .collection("PIC")
               .doc(),
             pc
+          );
+          batchCounter = batchCounter + 1;
+          batches[batchCounter] = db.batch();
+          batches[batchCounter].set(
+            db
+              .collection("users")
+              .doc(pc.handle)
+              .collection("schedule")
+              .doc(feedback.id),
+            {...newShedule,typeId:feedback.id}
           );
           batchCounter = batchCounter + 1;
         });
@@ -191,7 +220,8 @@ exports.postTask = (req, res) => {
               batches[batchCounter].update(uref.ref, {
                 OAS: uref.data().OAS + 1
               });
-              batchCounter++;
+              
+          batchCounter = batchCounter + 1;
             });
           batches[batchCounter] = db.batch();
           batches[batchCounter].set(
@@ -202,7 +232,18 @@ exports.postTask = (req, res) => {
               .doc(),
             sup
           );
-          batchCounter++;
+          
+          batchCounter = batchCounter + 1;
+          batches[batchCounter] = db.batch();
+          batches[batchCounter].set(
+            db
+              .collection("users")
+              .doc(sup.handle)
+              .collection("schedule")
+              .doc(feedback.id),
+            {...newShedule,typeId:feedback.id}
+          );
+          batchCounter = batchCounter + 1;
         });
         PICS.forEach((pc, j) => {
           db.doc(`/users/${pc.handle}`)
@@ -212,7 +253,8 @@ exports.postTask = (req, res) => {
               batches[batchCounter].update(picref.ref, {
                 OAPIC: picref.data().OAPIC + 1
               });
-              batchCounter++;
+              
+          batchCounter = batchCounter + 1;
             });
           batches[batchCounter] = db.batch();
           batches[batchCounter].set(
@@ -223,7 +265,18 @@ exports.postTask = (req, res) => {
               .doc(),
             pc
           );
-          batchCounter++;
+          
+          batchCounter = batchCounter + 1;
+          batches[batchCounter] = db.batch();
+          batches[batchCounter].set(
+            db
+              .collection("users")
+              .doc(pc.handle)
+              .collection("schedule")
+              .doc(feedback.id),
+            {...newShedule,typeId:feedback.id}
+          );
+          batchCounter = batchCounter + 1;
         });
         return null;
       })
@@ -885,6 +938,8 @@ exports.changeTaskStatus = (req, res) => {
     return res.status(401).json({ Error: "Unauthorized!" });
   if (req.params.taskId) {
     let updatedTask = {};
+    let batches = [];
+    let batchCounter = 0;
     db.doc(`/tasks/${req.params.taskId}`)
       .get()
       .then(taskRef => {
@@ -896,16 +951,20 @@ exports.changeTaskStatus = (req, res) => {
           if (taskRef.data().userHandle != req.user.handle)
             return res.status(401).json({ error: "Unauthorized" });
           else {
-            const batch = db.batch();
-            let i = 0;
-            let j = 0;
-            let supArr = [];
-            let picArr = [];
+            let newShedule = {
+              body: req.body.title,
+              createdAt: new Date().toISOString(),
+              deadline: req.body.deadline,
+              repeat: req.body.repeat,
+              type: 'task'
+            }
             updatedTask = taskRef.data();
-            batch.update(taskRef.ref, {
+            batches[batchCounter] = db.batch();
+            batches[batchCounter].update(taskRef.ref, {
               lastStatusLog: new Date().toISOString(),
               status: req.body.status
             });
+            batchCounter = batchCounter + 1;
             updatedTask.status = req.body.status;
             if (taskRef.data().status === "ongoing") {
               if (req.body.status === "completed") {
@@ -917,26 +976,44 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
                           if (req.body.deadline >= new Date().toISOString()) {
-                            batch.update(supArr[i], {
-                              OAS: supRefData.data().OAS - 1,
-                              COTAS: supRefData.data().COTAS + 1
-                            });
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db
+                                .collection("users")
+                                .doc(supRef.data().handle),
+                                {
+                                  OAS: supRefData.data().OAS - 1,
+                                  COTAS: supRefData.data().COTAS + 1
+                                });
+                            batchCounter = batchCounter + 1;
                             updatedTask.OAS = supRefData.data().OAS - 1;
                             updatedTask.COTAS = supRefData.data().COTAS + 1;
                           } else {
-                            batch.update(supArr[i], {
-                              OAS: supRefData.data().OAS - 1,
-                              CLAS: supRefData.data().CLAS + 1
-                            });
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db
+                                .collection("users")
+                                .doc(supRef.data().handle),
+                                {
+                                  OAS: supRefData.data().OAS - 1,
+                                  CLAS: supRefData.data().CLAS + 1
+                                }
+                            );
+                            batchCounter = batchCounter + 1;
                             updatedTask.OAS = supRefData.data().OAS - 1;
                             updatedTask.CLAS = supRefData.data().CLAS + 1;
                           }
+                          batches[batchCounter] = db.batch();
+                          batches[batchCounter].delete(
+                            db
+                              .collection("users")
+                              .doc(supRef.data().handle)
+                              .collection("schedule")
+                              .doc(req.params.taskId)
+                          );
+                          batchCounter = batchCounter + 1;
                         });
-                      i = i + 1;
                     });
                   })
                   .then(() => {
@@ -948,30 +1025,38 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              if (
-                                req.body.deadline >= new Date().toISOString()
-                              ) {
-                                batch.update(picArr[j], {
-                                  OAPIC: picRefData.data().OAPIC - 1,
-                                  COTAPIC: picRefData.data().COTAPIC + 1
-                                });
+                              if (req.body.deadline >= new Date().toISOString()) {
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    OAPIC: picRefData.data().OAPIC - 1,
+                                    COTAPIC: picRefData.data().COTAPIC + 1
+                                  });
+                                batchCounter = batchCounter + 1;
                                 updatedTask.OAPIC = supRefData.data().OAPIC - 1;
-                                updatedTask.COTAPIC =
-                                  supRefData.data().COTAPIC + 1;
+                                updatedTask.COTAPIC = supRefData.data().COTAPIC + 1;
                               } else {
-                                batch.update(picArr[j], {
-                                  OAPIC: picRefData.data().OAPIC - 1,
-                                  CLAPIC: picRefData.data().CLAPIC + 1
-                                });
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    OAPIC: picRefData.data().OAPIC - 1,
+                                    CLAPIC: picRefData.data().CLAPIC + 1
+                                  });
+                                batchCounter = batchCounter + 1;
                                 updatedTask.OAPIC = supRefData.data().OAPIC - 1;
-                                updatedTask.CLAPIC =
-                                  supRefData.data().CLAPIC + 1;
+                                updatedTask.CLAPIC = supRefData.data().CLAPIC + 1;
                               }
                             });
-                          j = j + 1;
+                          
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].delete(
+                              db
+                                .collection("users")
+                                .doc(picRef.data().handle)
+                                .collection("schedule")
+                                .doc(req.params.taskId)
+                            );
+                            batchCounter = batchCounter + 1;
                         });
                       });
                   });
@@ -984,17 +1069,26 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
+                          batches[batchCounter] = db.batch();
+                          batches[batchCounter].update(
+                            db.collection("users").doc(supRef.data().handle),{
+                              OAS: supRefData.data().OAS - 1,
+                              FAS: supRefData.data().FAS + 1
+                            }
                           );
-                          batch.update(supArr[i], {
-                            OAS: supRefData.data().OAS - 1,
-                            FAS: supRefData.data().FAS + 1
-                          });
+                          batchCounter = batchCounter + 1;
                           updatedTask.OAS = supRefData.data().OAS - 1;
                           updatedTask.FAS = supRefData.data().FAS + 1;
                         });
-                      i = i + 1;
+                        batches[batchCounter] = db.batch();
+                        batches[batchCounter].delete(
+                          db
+                            .collection("users")
+                            .doc(supRef.data().handle)
+                            .collection("schedule")
+                            .doc(req.params.taskId)
+                        );
+                        batchCounter = batchCounter + 1;
                     });
                   })
                   .then(() => {
@@ -1006,17 +1100,26 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
+                              batches[batchCounter] = db.batch();
+                              batches[batchCounter].update(
+                                db.collection("users").doc(picRef.data().handle),{
+                                  OAPIC: picRefData.data().OAPIC - 1,
+                                  FAPIC: picRefData.data().FAPIC + 1
+                                }
                               );
-                              batch.update(picArr[j], {
-                                OAPIC: picRefData.data().OAPIC - 1,
-                                FAPIC: picRefData.data().FAPIC + 1
-                              });
-                              updatedTask.OAPIC = supRefData.data().OAPIC - 1;
-                              updatedTask.FAPIC = supRefData.data().FAPIC + 1;
+                              batchCounter = batchCounter + 1;
+                              updatedTask.OAPIC = picRefData.data().OAPIC - 1;
+                              updatedTask.FAPIC = picRefData.data().FAPIC + 1;
                             });
-                          j = j + 1;
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].delete(
+                              db
+                                .collection("users")
+                                .doc(picRef.data().handle)
+                                .collection("schedule")
+                                .doc(req.params.taskId)
+                            );
+                            batchCounter = batchCounter + 1;
                         });
                       });
                   });
@@ -1029,17 +1132,25 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
-                          batch.update(supArr[i], {
-                            OAS: supRefData.data().OAS - 1,
-                            DISCO: supRefData.data().DISCO + 1
-                          });
+                          batches[batchCounter] = db.batch();
+                          batches[batchCounter].update(
+                            db.collection("users").doc(supRef.data().handle),{
+                              OAS: supRefData.data().OAS - 1,
+                              DISCO: supRefData.data().DISCO + 1
+                            });
+                          batchCounter = batchCounter + 1;
                           updatedTask.OAS = supRefData.data().OAS - 1;
                           updatedTask.DISCO = supRefData.data().DISCO + 1;
                         });
-                      i = i + 1;
+                        batches[batchCounter] = db.batch();
+                        batches[batchCounter].delete(
+                          db
+                            .collection("users")
+                            .doc(supRef.data().handle)
+                            .collection("schedule")
+                            .doc(req.params.taskId)
+                        );
+                        batchCounter = batchCounter + 1;
                     });
                   })
                   .then(() => {
@@ -1051,17 +1162,25 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              batch.update(picArr[j], {
-                                OAPIC: picRefData.data().OAPIC - 1,
-                                DISCO: picRefData.data().DISCO + 1
-                              });
-                              updatedTask.OAPIC = supRefData.data().OAPIC - 1;
-                              updatedTask.DISCO = supRefData.data().DISCO + 1;
+                              batches[batchCounter] = db.batch();
+                              batches[batchCounter].update(
+                                db.collection("users").doc(picRef.data().handle),{
+                                  OAPIC: picRefData.data().OAPIC - 1,
+                                  DISCO: picRefData.data().DISCO + 1
+                                });
+                              batchCounter = batchCounter + 1;
+                              updatedTask.OAPIC = picRefData.data().OAPIC - 1;
+                              updatedTask.DISCO = picRefData.data().DISCO + 1;
                             });
-                          j = j + 1;
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].delete(
+                              db
+                                .collection("users")
+                                .doc(picRef.data().handle)
+                                .collection("schedule")
+                                .doc(req.params.taskId)
+                            );
+                            batchCounter = batchCounter + 1;
                         });
                       });
                   });
@@ -1076,28 +1195,40 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
                           if (
                             req.body.deadline >= taskRef.data().lastStatusLog
                           ) {
-                            batch.update(supArr[i], {
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                            db.collection("users").doc(supRef.data().handle), {
                               OAS: supRefData.data().OAS + 1,
                               COTAS: supRefData.data().COTAS - 1
                             });
+                            batchCounter = batchCounter + 1;
                             updatedTask.OAS = supRefData.data().OAS + 1;
                             updatedTask.COTAS = supRefData.data().COTAS - 1;
                           } else {
-                            batch.update(supArr[i], {
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                            db.collection("users").doc(supRef.data().handle), {
                               OAS: supRefData.data().OAS + 1,
                               CLAS: supRefData.data().CLAS - 1
                             });
+                            batchCounter = batchCounter + 1;
                             updatedTask.OAS = supRefData.data().OAS + 1;
                             updatedTask.CLAS = supRefData.data().CLAS - 1;
                           }
                         });
-                      i = i + 1;
+                        batches[batchCounter] = db.batch();
+                        batches[batchCounter].set(
+                          db
+                            .collection("users")
+                            .doc(supRef.data().handle)
+                            .collection("schedule")
+                            .doc(req.params.taskId),
+                            {...newShedule,typeId:req.params.taskId}
+                        );
+                        batchCounter = batchCounter + 1;
                     });
                   })
                   .then(() => {
@@ -1109,31 +1240,41 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
                               if (
                                 req.body.deadline >=
                                 taskRef.data().lastStatusLog
                               ) {
-                                batch.update(picArr[j], {
-                                  OAPIC: picRefData.data().OAPIC + 1,
-                                  COTAPIC: picRefData.data().COTAPIC - 1
-                                });
-                                updatedTask.COTAPIC =
-                                  supRefData.data().COTAPIC - 1;
-                                updatedTask.OAPIC = supRefData.data().OAPIC + 1;
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    OAPIC: picRefData.data().OAPIC + 1,
+                                    COTAPIC: picRefData.data().COTAPIC - 1
+                                  });
+                                batchCounter = batchCounter + 1;
+                                updatedTask.COTAPIC = picRefData.data().COTAPIC - 1;
+                                updatedTask.OAPIC = picRefData.data().OAPIC + 1;
                               } else {
-                                batch.update(picArr[j], {
-                                  OAPIC: picRefData.data().OAPIC + 1,
-                                  CLAPIC: picRefData.data().CLAPIC - 1
-                                });
-                                updatedTask.CLAPIC =
-                                  supRefData.data().CLAPIC - 1;
-                                updatedTask.OAPIC = supRefData.data().OAPIC + 1;
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    OAPIC: picRefData.data().OAPIC + 1,
+                                    CLAPIC: picRefData.data().CLAPIC - 1
+                                  });
+                                batchCounter = batchCounter + 1;
+                                updatedTask.CLAPIC = picRefData.data().CLAPIC - 1;
+                                updatedTask.OAPIC = picRefData.data().OAPIC + 1;
                               }
                             });
-                          j = j + 1;
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].set(
+                              db
+                                .collection("users")
+                                .doc(picRef.data().handle)
+                                .collection("schedule")
+                                .doc(req.params.taskId),
+                                {...newShedule,typeId:req.params.taskId}
+                            );
+                            batchCounter = batchCounter + 1;
                         });
                       });
                   });
@@ -1146,28 +1287,28 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
-                          if (
-                            req.body.deadline >= taskRef.data().lastStatusLog
-                          ) {
-                            batch.update(supArr[i], {
-                              FAS: supRefData.data().FAS + 1,
-                              COTAS: supRefData.data().COTAS - 1
-                            });
+                          if (  req.body.deadline >= taskRef.data().lastStatusLog ) {
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db.collection("users").doc(supRef.data().handle),{
+                                FAS: supRefData.data().FAS + 1,
+                                COTAS: supRefData.data().COTAS - 1
+                              });
+                            batchCounter = batchCounter + 1;
                             updatedTask.FAS = supRefData.data().FAS + 1;
                             updatedTask.COTAS = supRefData.data().COTAS - 1;
                           } else {
-                            batch.update(supArr[i], {
-                              FAS: supRefData.data().FAS + 1,
-                              CLAS: supRefData.data().CLAS - 1
-                            });
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db.collection("users").doc(supRef.data().handle),{
+                                FAS: supRefData.data().FAS + 1,
+                                CLAS: supRefData.data().CLAS - 1
+                              });
+                            batchCounter = batchCounter + 1;
                             updatedTask.CLAS = supRefData.data().CLAS - 1;
                             updatedTask.FAS = supRefData.data().FAS + 1;
                           }
                         });
-                      i = i + 1;
                     });
                   })
                   .then(() => {
@@ -1179,31 +1320,28 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              if (
-                                req.body.deadline >=
-                                taskRef.data().lastStatusLog
-                              ) {
-                                batch.update(picArr[j], {
-                                  COTAPIC: picRefData.data().COTAPIC - 1,
-                                  FAPIC: picRefData.data().FAPIC + 1
-                                });
-                                updatedTask.COTAPIC =
-                                  supRefData.data().COTAPIC - 1;
-                                updatedTask.FAPIC = supRefData.data().FAPIC + 1;
+                              if(req.body.deadline >= taskRef.data().lastStatusLog) {
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    COTAPIC: picRefData.data().COTAPIC - 1,
+                                    FAPIC: picRefData.data().FAPIC + 1
+                                  });
+                                batchCounter = batchCounter + 1;
+                                updatedTask.COTAPIC = picRefData.data().COTAPIC - 1;
+                                updatedTask.FAPIC = picRefData.data().FAPIC + 1;
                               } else {
-                                batch.update(picArr[j], {
-                                  CLAPIC: picRefData.data().CLAPIC - 1,
-                                  FAPIC: picRefData.data().FAPIC + 1
-                                });
-                                updatedTask.CLAPIC =
-                                  supRefData.data().CLAPIC - 1;
-                                updatedTask.FAPIC = supRefData.data().FAPIC + 1;
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    CLAPIC: picRefData.data().CLAPIC - 1,
+                                    FAPIC: picRefData.data().FAPIC + 1
+                                  });
+                                batchCounter = batchCounter + 1;
+                                updatedTask.CLAPIC = picRefData.data().CLAPIC - 1;
+                                updatedTask.FAPIC = picRefData.data().FAPIC + 1;
                               }
                             });
-                          j = j + 1;
                         });
                       });
                   });
@@ -1216,28 +1354,28 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
-                          if (
-                            req.body.deadline >= taskRef.data().lastStatusLog
-                          ) {
-                            batch.update(supArr[i], {
-                              DISCO: supRefData.data().DISCO + 1,
-                              COTAS: supRefData.data().COTAS - 1
-                            });
+                          if ( req.body.deadline >= taskRef.data().lastStatusLog ) {
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db.collection("users").doc(supRef.data().handle),{
+                                DISCO: supRefData.data().DISCO + 1,
+                                COTAS: supRefData.data().COTAS - 1
+                              });
+                            batchCounter = batchCounter + 1;
                             updatedTask.DISCO = supRefData.data().DISCO + 1;
                             updatedTask.COTAS = supRefData.data().COTAS - 1;
                           } else {
-                            batch.update(supArr[i], {
-                              DISCO: supRefData.data().DISCO + 1,
-                              CLAS: supRefData.data().CLAS - 1
-                            });
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db.collection("users").doc(supRef.data().handle),{
+                                DISCO: supRefData.data().DISCO + 1,
+                                CLAS: supRefData.data().CLAS - 1
+                              });
+                            batchCounter = batchCounter + 1;
                             updatedTask.CLAS = supRefData.data().CLAS - 1;
                             updatedTask.DISCO = supRefData.data().DISCO + 1;
                           }
                         });
-                      i = i + 1;
                     });
                   })
                   .then(() => {
@@ -1249,31 +1387,28 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              if (
-                                req.body.deadline >=
-                                taskRef.data().lastStatusLog
-                              ) {
-                                batch.update(picArr[j], {
-                                  COTAPIC: picRefData.data().COTAPIC - 1,
-                                  DISCO: picRefData.data().DISCO + 1
-                                });
-                                updatedTask.COTAPIC =
-                                  supRefData.data().COTAPIC - 1;
-                                updatedTask.DISCO = supRefData.data().DISCO + 1;
+                              if ( req.body.deadline >=  taskRef.data().lastStatusLog ) {
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    COTAPIC: picRefData.data().COTAPIC - 1,
+                                    DISCO: picRefData.data().DISCO + 1
+                                  });
+                                batchCounter = batchCounter + 1;
+                                updatedTask.COTAPIC = picRefData.data().COTAPIC - 1;
+                                updatedTask.DISCO = picRefData.data().DISCO + 1;
                               } else {
-                                batch.update(picArr[j], {
-                                  CLAPIC: picRefData.data().CLAPIC - 1,
-                                  DISCO: picRefData.data().DISCO + 1
-                                });
-                                updatedTask.CLAPIC =
-                                  supRefData.data().CLAPIC - 1;
-                                updatedTask.DISCO = supRefData.data().DISCO + 1;
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    CLAPIC: picRefData.data().CLAPIC - 1,
+                                    DISCO: picRefData.data().DISCO + 1
+                                  });
+                                batchCounter = batchCounter + 1;
+                                updatedTask.CLAPIC = picRefData.data().CLAPIC - 1;
+                                updatedTask.DISCO = picRefData.data().DISCO + 1;
                               }
                             });
-                          j = j + 1;
                         });
                       });
                   });
@@ -1287,18 +1422,25 @@ exports.changeTaskStatus = (req, res) => {
                     supsRef.forEach(supRef => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
-                        .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
-                          batch.update(supArr[i], {
-                            OAS: supRefData.data().OAS + 1,
-                            FAS: supRefData.data().FAS - 1
-                          });
+                        .then(supRefData => {   
+                          batches[batchCounter] = db.batch();
+                          batches[batchCounter].update(
+                            db.collection("users").doc(supRef.data().handle),{
+                              OAS: supRefData.data().OAS + 1,
+                              FAS: supRefData.data().FAS - 1
+                            });
+                          batchCounter = batchCounter + 1;
                           updatedTask.FAS = supRefData.data().FAS - 1;
                           updatedTask.OAS = supRefData.data().OAS + 1;
                         });
-                      i = i + 1;
+                        batches[batchCounter] = db.batch();
+                        batches[batchCounter].set(
+                          db
+                            .collection("users")
+                            .doc(supRef.data().handle)
+                            .collection("schedule")
+                            .doc(req.params.taskId),{...newShedule,typeId:req.params.taskId});
+                        batchCounter = batchCounter + 1;
                     });
                   })
                   .then(() => {
@@ -1310,17 +1452,24 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              batch.update(picArr[j], {
-                                FAPIC: picRefData.data().FAPIC - 1,
-                                OAPIC: picRefData.data().OAPIC + 1
-                              });
-                              updatedTask.FAPIC = supRefData.data().FAPIC - 1;
-                              updatedTask.OAPIC = supRefData.data().OAPIC + 1;
+                              batches[batchCounter] = db.batch();
+                              batches[batchCounter].update(
+                                db.collection("users").doc(picRef.data().handle),{
+                                  FAPIC: picRefData.data().FAPIC - 1,
+                                  OAPIC: picRefData.data().OAPIC + 1
+                                });
+                              batchCounter = batchCounter + 1;
+                              updatedTask.FAPIC = picRefData.data().FAPIC - 1;
+                              updatedTask.OAPIC = picRefData.data().OAPIC + 1;
                             });
-                          j = j + 1;
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].set(
+                              db
+                                .collection("users")
+                                .doc(picRef.data().handle)
+                                .collection("schedule")
+                                .doc(req.params.taskId),{...newShedule,typeId:req.params.taskId});
+                            batchCounter = batchCounter + 1;
                         });
                       });
                   });
@@ -1333,26 +1482,28 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
                           if (req.body.deadline >= new Date().toISOString()) {
-                            batch.update(supArr[i], {
-                              FAS: supRefData.data().FAS - 1,
-                              COTAS: supRefData.data().COTAS + 1
-                            });
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db.collection("users").doc(supRef.data().handle),{
+                                FAS: supRefData.data().FAS - 1,
+                                COTAS: supRefData.data().COTAS + 1
+                              });
+                            batchCounter = batchCounter + 1;
                             updatedTask.FAS = supRefData.data().FAS - 1;
                             updatedTask.COTAS = supRefData.data().COTAS + 1;
                           } else {
-                            batch.update(supArr[i], {
-                              FAS: supRefData.data().FAS - 1,
-                              CLAS: supRefData.data().CLAS + 1
-                            });
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db.collection("users").doc(supRef.data().handle),{
+                                FAS: supRefData.data().FAS - 1,
+                                CLAS: supRefData.data().CLAS + 1
+                              });
+                            batchCounter = batchCounter + 1;
                             updatedTask.FAS = supRefData.data().FAS - 1;
                             updatedTask.CLAS = supRefData.data().CLAS + 1;
                           }
                         });
-                      i = i + 1;
                     });
                   })
                   .then(() => {
@@ -1364,17 +1515,16 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              batch.update(picArr[j], {
-                                OAPIC: picRefData.data().OAPIC - 1,
-                                FAPIC: picRefData.data().FAPIC + 1
-                              });
-                              updatedTask.OAPIC = supRefData.data().OAPIC - 1;
-                              updatedTask.FAPIC = supRefData.data().FAPIC + 1;
+                              batches[batchCounter] = db.batch();
+                              batches[batchCounter].update(
+                                db.collection("users").doc(picRef.data().handle),{
+                                  OAPIC: picRefData.data().OAPIC - 1,
+                                  FAPIC: picRefData.data().FAPIC + 1
+                                });
+                              batchCounter = batchCounter + 1;
+                              updatedTask.OAPIC = picRefData.data().OAPIC - 1;
+                              updatedTask.FAPIC = picRefData.data().FAPIC + 1;
                             });
-                          j = j + 1;
                         });
                       });
                   });
@@ -1387,17 +1537,16 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
-                          batch.update(supArr[i], {
-                            DISCO: supRefData.data().DISCO + 1,
-                            FAS: supRefData.data().FAS - 1
-                          });
+                          batches[batchCounter] = db.batch();
+                          batches[batchCounter].update(
+                            db.collection("users").doc(supRef.data().handle),{
+                              DISCO: supRefData.data().DISCO + 1,
+                              FAS: supRefData.data().FAS - 1
+                            });
+                          batchCounter = batchCounter + 1;
                           updatedTask.FAS = supRefData.data().FAS - 1;
                           updatedTask.DISCO = supRefData.data().DISCO + 1;
                         });
-                      i = i + 1;
                     });
                   })
                   .then(() => {
@@ -1409,17 +1558,16 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              batch.update(picArr[j], {
-                                FAPIC: picRefData.data().FAPIC - 1,
-                                DISCO: picRefData.data().DISCO + 1
-                              });
-                              updatedTask.FAPIC = supRefData.data().FAPIC - 1;
-                              updatedTask.DISCO = supRefData.data().DISCO + 1;
+                              batches[batchCounter] = db.batch();
+                              batches[batchCounter].update(
+                                db.collection("users").doc(picRef.data().handle),{
+                                  FAPIC: picRefData.data().FAPIC - 1,
+                                  DISCO: picRefData.data().DISCO + 1
+                                });
+                              batchCounter = batchCounter + 1;
+                              updatedTask.FAPIC = picRefData.data().FAPIC - 1;
+                              updatedTask.DISCO = picRefData.data().DISCO + 1;
                             });
-                          j = j + 1;
                         });
                       });
                   });
@@ -1434,17 +1582,24 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
-                          batch.update(supArr[i], {
-                            OAS: supRefData.data().OAS + 1,
-                            DISCO: supRefData.data().DISCO - 1
-                          });
+                          batches[batchCounter] = db.batch();
+                          batches[batchCounter].update(
+                            db.collection("users").doc(supRef.data().handle),{
+                              OAS: supRefData.data().OAS + 1,
+                              DISCO: supRefData.data().DISCO - 1
+                            });
+                          batchCounter = batchCounter + 1;
                           updatedTask.DISCO = supRefData.data().DISCO - 1;
                           updatedTask.OAS = supRefData.data().OAS + 1;
                         });
-                      i = i + 1;
+                        batches[batchCounter] = db.batch();
+                        batches[batchCounter].set(
+                          db
+                            .collection("users")
+                            .doc(supRef.data().handle)
+                            .collection("schedule")
+                            .doc(req.params.taskId),{...newShedule,typeId:req.params.taskId});
+                        batchCounter = batchCounter + 1;
                     });
                   })
                   .then(() => {
@@ -1456,17 +1611,24 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              batch.update(picArr[j], {
-                                DISCO: picRefData.data().DISCO - 1,
-                                OAPIC: picRefData.data().OAPIC + 1
-                              });
-                              updatedTask.DISCO = supRefData.data().DISCO - 1;
-                              updatedTask.OAPIC = supRefData.data().OAPIC + 1;
+                              batches[batchCounter] = db.batch();
+                              batches[batchCounter].update(
+                                db.collection("users").doc(picRef.data().handle),{
+                                  DISCO: picRefData.data().DISCO - 1,
+                                  OAPIC: picRefData.data().OAPIC + 1
+                                });
+                              batchCounter = batchCounter + 1;
+                              updatedTask.DISCO = picRefData.data().DISCO - 1;
+                              updatedTask.OAPIC = picRefData.data().OAPIC + 1;
                             });
-                          j = j + 1;
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].set(
+                              db
+                                .collection("users")
+                                .doc(picRef.data().handle)
+                                .collection("schedule")
+                                .doc(req.params.taskId),{...newShedule,typeId:req.params.taskId});
+                            batchCounter = batchCounter + 1;
                         });
                       });
                   });
@@ -1479,26 +1641,28 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
                           if (req.body.deadline >= new Date().toISOString()) {
-                            batch.update(supArr[i], {
-                              DISCO: supRefData.data().DISCO - 1,
-                              COTAS: supRefData.data().COTAS + 1
-                            });
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db.collection("users").doc(supRef.data().handle),{
+                                DISCO: supRefData.data().DISCO - 1,
+                                COTAS: supRefData.data().COTAS + 1
+                              });
+                            batchCounter = batchCounter + 1;
                             updatedTask.DISCO = supRefData.data().DISCO - 1;
                             updatedTask.COTAS = supRefData.data().COTAS + 1;
                           } else {
-                            batch.update(supArr[i], {
-                              DISCO: supRefData.data().DISCO - 1,
-                              CLAS: supRefData.data().CLAS + 1
-                            });
+                            batches[batchCounter] = db.batch();
+                            batches[batchCounter].update(
+                              db.collection("users").doc(supRef.data().handle),{
+                                DISCO: supRefData.data().DISCO - 1,
+                                CLAS: supRefData.data().CLAS + 1
+                              });
+                            batchCounter = batchCounter + 1;
                             updatedTask.DISCO = supRefData.data().DISCO - 1;
                             updatedTask.CLAS = supRefData.data().CLAS + 1;
                           }
                         });
-                      i = i + 1;
                     });
                   })
                   .then(() => {
@@ -1510,30 +1674,28 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              if (
-                                req.body.deadline >= new Date().toISOString()
-                              ) {
-                                batch.update(picArr[j], {
-                                  COTAPIC: picRefData.data().COTAPIC + 1,
-                                  DISCO: picRefData.data().DISCO - 1
-                                });
-                                updatedTask.DISCO = supRefData.data().DISCO - 1;
-                                updatedTask.COTAPIC =
-                                  supRefData.data().COTAPIC + 1;
+                              if ( req.body.deadline >= new Date().toISOString() ) {
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    COTAPIC: picRefData.data().COTAPIC + 1,
+                                    DISCO: picRefData.data().DISCO - 1
+                                  });
+                                batchCounter = batchCounter + 1;
+                                updatedTask.DISCO = picRefData.data().DISCO - 1;
+                                updatedTask.COTAPIC = picRefData.data().COTAPIC + 1;
                               } else {
-                                batch.update(picArr[j], {
-                                  CLAPIC: picRefData.data().CLAPIC + 1,
-                                  DISCO: picRefData.data().DISCO - 1
-                                });
-                                updatedTask.DISCO = supRefData.data().DISCO - 1;
-                                updatedTask.CLAPIC =
-                                  supRefData.data().CLAPIC + 1;
+                                batches[batchCounter] = db.batch();
+                                batches[batchCounter].update(
+                                  db.collection("users").doc(picRef.data().handle),{
+                                    CLAPIC: picRefData.data().CLAPIC + 1,
+                                    DISCO: picRefData.data().DISCO - 1
+                                  });
+                                batchCounter = batchCounter + 1;
+                                updatedTask.DISCO = picRefData.data().DISCO - 1;
+                                updatedTask.CLAPIC = picRefData.data().CLAPIC + 1;
                               }
                             });
-                          j = j + 1;
                         });
                       });
                   });
@@ -1546,17 +1708,16 @@ exports.changeTaskStatus = (req, res) => {
                       db.doc(`/users/${supRef.data().handle}`)
                         .get()
                         .then(supRefData => {
-                          supArr.push(
-                            db.collection("users").doc(supRef.data().handle)
-                          );
-                          batch.update(supArr[i], {
-                            DISCO: supRefData.data().DISCO - 1,
-                            FAS: supRefData.data().FAS + 1
-                          });
+                          batches[batchCounter] = db.batch();
+                          batches[batchCounter].update(
+                            db.collection("users").doc(supRef.data().handle),{
+                              DISCO: supRefData.data().DISCO - 1,
+                              FAS: supRefData.data().FAS + 1
+                            });
+                          batchCounter = batchCounter + 1;
                           updatedTask.DISCO = supRefData.data().DISCO - 1;
                           updatedTask.FAS = supRefData.data().FAS + 1;
                         });
-                      i = i + 1;
                     });
                   })
                   .then(() => {
@@ -1568,24 +1729,30 @@ exports.changeTaskStatus = (req, res) => {
                           db.doc(`/users/${picRef.data().handle}`)
                             .get()
                             .then(picRefData => {
-                              picArr.push(
-                                db.collection("users").doc(picRef.data().handle)
-                              );
-                              batch.update(picArr[j], {
-                                FAPIC: picRefData.data().FAPIC + 1,
-                                DISCO: picRefData.data().DISCO - 1
-                              });
+                              batches[batchCounter] = db.batch();
+                              batches[batchCounter].update(
+                                db.collection("users").doc(picRef.data().handle),{
+                                  FAPIC: picRefData.data().FAPIC + 1,
+                                  DISCO: picRefData.data().DISCO - 1
+                                });
+                              batchCounter = batchCounter + 1;
                               updatedTask.DISCO = supRefData.data().DISCO - 1;
                               updatedTask.FAPIC = supRefData.data().COTAS + 1;
                             });
-                          j = j + 1;
                         });
                       });
                   });
               }
             }
-            return batch.commit();
+            return true
           }
+        }
+      })
+      .then(()=>{
+        for (var i = 0; i < batches.length; i++) {
+          batches[i].commit().then(function() {
+            console.count("wrote batch");
+          })
         }
       })
       .then(() => {
@@ -1616,6 +1783,8 @@ exports.changeTaskStatus = (req, res) => {
 exports.changeTaskDeadline = (req, res) => {
   if (req.user.onDuty == false)
     return res.status(401).json({ Error: "Unauthorized!" });
+  let batches = []
+  let batchCounter = 0
   if (req.params.taskId) {
     db.doc(`/tasks/${req.params.taskId}`)
       .get()
@@ -1636,6 +1805,25 @@ exports.changeTaskDeadline = (req, res) => {
             else return taskRef.ref.update({ deadline: req.body.deadline });
           }
         }
+      })
+      .then(()=>{
+        return db.collectionGroup("schedule").where("typeId", "==", req.params.taskId).get()
+        .then(schedules =>{
+          schedules.forEach(sch=>{
+            batches[batchCounter] = db.batch()
+            batches[batchCounter].update(sch.ref,{ deadline: req.body.deadline })
+            batchCounter = batchCounter + 1;
+          })
+          return true
+        })
+        .then(()=>{
+          for (var i = 0; i < batches.length; i++) {
+            batches[i].commit().then(function() {
+              console.count("wrote batch");
+            });
+          }
+          return true
+        })
       })
       .then(() => {
         return res.status(200).json({

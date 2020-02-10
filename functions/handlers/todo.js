@@ -31,7 +31,8 @@ exports.addTodo = (req, res) => {
           .collection("users")
           .doc(req.user.handle)
           .collection("schedule")
-          .add({...newShedule,typeId:todoid});
+          .doc(todoid)
+          .set({...newShedule,typeId:todoid});
       })
       .then(() => {
         return res.status(200).json({
@@ -70,10 +71,7 @@ exports.editTodo = (req, res) => {
     .doc(todoid)
     .update(newTodo)
     .then(() => {
-        return db.collectionGroup("schedule").where("typeId","==",todoid).limit(1).get()
-    })
-    .then((schedulefeed)=>{
-        return schedulefeed[0].ref.update(newShedule)
+        return db.collection("users").doc(req.user.handle).collection("schedule").doc(todoid).update(newShedule)
     })
     .then(() => {
         return res.status(200).json({ message: "update successful!"});
@@ -99,19 +97,18 @@ exports.changeTodoStatus = (req, res) => {
     })
     .then(() => {
         if(newState === "complete")
-        return db.collectionGroup("schedule").where("typeId","==",todoid).limit(1).get()
-        .then((schFeed)=>{
-            schFeed[0].ref.delete()
-        })
+        return db.collection("users").doc(req.user.handle).collection("schedule").doc(todoid).delete()
         else return db.collection("users")
         .doc(req.user.handle)
         .collection("schedule")
-        .add({
+        .doc(todoid)
+        .set({
             body: todo.body,
             createdAt: new Date().toISOString(),
             deadline: todo.deadline,
             repeat: todo.repeat,
-            type: 'ToDo'
+            type: 'ToDo',
+            typeId:todoid
           })
     })
     .then(() => {
