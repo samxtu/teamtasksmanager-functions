@@ -13,7 +13,7 @@ exports.postTask = (req, res) => {
     });
     return res.status(401).json({ Error: "Unauthorized!" });
   }
-  if (req.body.title.trim() == "") {
+  if (req.body.title && req.body.title.trim() == "") {
     req.files.forEach(file => {
       admin
         .storage()
@@ -23,7 +23,7 @@ exports.postTask = (req, res) => {
     });
     return res.status(400).json({ title: "Must not be empty!" });
   }
-  if (req.body.deadline.trim() == "") {
+  if (req.body.deadline && req.body.deadline.trim() == "") {
     req.files.forEach(file => {
       admin
         .storage()
@@ -75,6 +75,7 @@ exports.postTask = (req, res) => {
     imageUrl: req.user.imageUrl,
     createdAt: new Date().toISOString(),
     deadline: req.body.deadline,
+    priority: req.body.priority,
     title: req.body.title,
     details: req.body.details,
     status: req.body.status,

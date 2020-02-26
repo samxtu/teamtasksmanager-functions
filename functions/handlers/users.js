@@ -16,10 +16,12 @@ exports.signup = (req, res) => {
     firstname: req.body.firstname,
     lastname: req.body.lastname,
     changeDuty: req.body.changeDuty,
+    branch: req.body.branch,
     department: req.body.department,
     clearance: req.body.clearance,
     addUser: req.body.addUser,
-    handle: req.body.handle
+    handle: req.body.handle,
+    position: req.body.position,
   };
   let errors = {};
   let userId, token;
@@ -79,6 +81,8 @@ exports.signup = (req, res) => {
         department: newUser.department,
         clearance: newUser.clearance,
         addUser: newUser.addUser,
+        position: newUser.position,
+        branch: newUser.branch,
         COTAS: 0,
         COTAPIC: 0,
         CLAS: 0,
@@ -112,6 +116,12 @@ exports.login = (req, res) => {
     password: req.body.password
   };
   let errors = {};
+  let reData = {
+    company: {
+      branches:[],
+      departments:[]
+    }
+  };
 
   if (isEmpty(user.email)) errors.email = "Must not be empty!";
   else if (!isEmail(user.email)) errors.email = "Email format not correct!";
@@ -119,23 +129,32 @@ exports.login = (req, res) => {
 
   if (Object.keys(errors).length > 0) return res.status(403).json(errors);
 
-  firebase
-    .auth()
-    .signInWithEmailAndPassword(user.email, user.password)
-    .then(data => {
-      return data.user.getIdToken();
+firebase
+  .auth()
+  .signInWithEmailAndPassword(user.email, user.password)
+  .then(data => {
+    reData.token = data.user.getIdToken();
+    return db.collection('company').get();
+  })
+  .then((comp)=>{
+    comp.forEach(com=>{
+      if(com.id === 'companyInfo') reData.company.info = com.data()
+      if(com.id === 'branches') reData.company.branches = com.data().branches
+      if(com.id === 'departments') reData.company.departments = com.data().departments
     })
-    .then(tok => {
-      return res.json({ token: tok });
-    })
-    .catch(err => {
-      console.error(err);
-      if (err.code === "auth/wrong-password")
-        return res
-          .status(403)
-          .json({ general: "Incorrect credentials, please try again!" });
-      else return res.status(500).json({ error: err.code });
-    });
+    return true
+  })
+  .then(() => {
+    return res.status(200).json({ data: reData });
+  })
+  .catch(err => {
+    console.error(err);
+    if (err.code === "auth/wrong-password")
+      return res
+        .status(403)
+        .json({ general: "Incorrect credentials, please try again!" });
+    else return res.status(500).json({ general: err.code });
+  });
 };
 
 exports.uploadProfileImage = (req, res) => {

@@ -7,9 +7,11 @@ exports.addTodo = (req, res) => {
     return res.status(400).json({ error: "Invalid due time!" });
   
     let newTodo = {
-      body: req.body.body.trim(),
+      body: req.body.body,
       createdAt: new Date().toISOString(),
       deadline: req.body.deadline,
+      category: req.body.category,
+      dueTime: req.body.dueTime,
       repeat: req.body.repeat,
       status: 'pending'
     };
@@ -103,10 +105,10 @@ exports.changeTodoStatus = (req, res) => {
         .collection("schedule")
         .doc(todoid)
         .set({
-            body: todo.body,
+            body: todo.data().body,
             createdAt: new Date().toISOString(),
-            deadline: todo.deadline,
-            repeat: todo.repeat,
+            deadline: todo.data().deadline,
+            repeat: todo.data().repeat,
             type: 'ToDo',
             typeId:todoid
           })
@@ -119,3 +121,21 @@ exports.changeTodoStatus = (req, res) => {
         return res.status(500).json({ error: err.code });
     });
   };
+
+exports.getTodos = (req,res) =>{
+  let resdo=[]
+  db.collection('users').doc(req.user.handle).collection('todo').orderBy('deadline','asc').get()
+  .then(todos=>{
+    todos.forEach(todo=>{
+      resdo.push({todoId:todo.id,...todo.data()})
+    })
+    return true;
+  })
+  .then(()=>{
+    return res.status(200).json(resdo);
+  })
+  .catch(err=>{
+    console.error(err.code)
+    return res.status(500).json({error: err.code})
+  })
+}

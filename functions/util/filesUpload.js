@@ -41,7 +41,8 @@ module.exports = (req, res, next) => {
               return reject(err);
             }
             if(mimetype === 'application/json'){
-             debody = require(`/tmp/${tempName}`);
+             debody.wat = require(`/tmp/${tempName}`);
+             debody = JSON.parse(debody.wat)
              dataTempName = tempName;
             } else {
             files.push({

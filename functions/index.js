@@ -20,7 +20,8 @@ const {
 const {
   addTodo,
   editTodo,
-  changeTodoStatus
+  changeTodoStatus,
+  getTodos
 } = require("./handlers/todo");
 const {
   postTask,
@@ -53,7 +54,9 @@ const {
 //todo routes
 app.post("/todo", FBAuth, addTodo);
 
-app.get("/todo/:todoid/:status", FBAuth, editTodo);
+app.get("/todos", FBAuth, getTodos);
+
+app.get("/todo/:todoid/:status", FBAuth, changeTodoStatus);
 
 app.post("/todo/:todoid", FBAuth, editTodo);
 
